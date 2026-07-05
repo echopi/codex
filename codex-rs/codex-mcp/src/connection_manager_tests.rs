@@ -1226,6 +1226,7 @@ async fn no_local_runtime_fails_local_stdio_but_keeps_local_http_server() {
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             }),
         ),
         (
@@ -1251,6 +1252,7 @@ async fn no_local_runtime_fails_local_stdio_but_keeps_local_http_server() {
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             }),
         ),
     ]);
@@ -1360,6 +1362,7 @@ fn mcp_init_error_display_prompts_for_github_pat() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         }),
         auth_status: McpAuthStatus::Unsupported,
     };
@@ -1413,6 +1416,7 @@ fn mcp_init_error_display_reports_generic_errors() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         }),
         auth_status: McpAuthStatus::Unsupported,
     };

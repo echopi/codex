@@ -50,6 +50,7 @@ async fn replace_mcp_servers_serializes_per_tool_approval_overrides() -> anyhow:
                     },
                 ),
             ]),
+            surface_notifications: false,
         },
     )]);
 
@@ -117,6 +118,7 @@ async fn replace_mcp_servers_serializes_oauth_client_id() -> anyhow::Result<()> 
             }),
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     )]);
 

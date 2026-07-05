@@ -313,6 +313,7 @@ async fn effective_mcp_servers_preserve_runtime_servers() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     ));
     catalog.register(McpServerRegistration::from_config(
@@ -338,6 +339,7 @@ async fn effective_mcp_servers_preserve_runtime_servers() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     ));
     catalog.register(McpServerRegistration::from_config(
