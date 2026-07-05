@@ -372,6 +372,22 @@ impl App {
         self.sync_side_thread_ui();
     }
 
+    /// Clears the completed flag when a follow-up turn starts in the active
+    /// /btw side thread so the next completion can re-mark it.
+    pub(super) fn reset_active_btw_completed(&mut self) {
+        let Some(active_thread_id) = self.active_thread_id else {
+            return;
+        };
+        let Some(state) = self.side_threads.get_mut(&active_thread_id) else {
+            return;
+        };
+        if !state.btw_mode || !state.btw_completed {
+            return;
+        }
+        state.btw_completed = false;
+        self.sync_side_thread_ui();
+    }
+
     pub(super) async fn maybe_return_from_side(
         &mut self,
         tui: &mut tui::Tui,
