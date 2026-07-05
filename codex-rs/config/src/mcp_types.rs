@@ -189,6 +189,13 @@ pub struct McpServerConfig {
     /// Per-tool approval settings keyed by tool name.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub tools: HashMap<String, McpServerToolConfig>,
+
+    /// When `true`, MCP server notifications matching channel ingress methods
+    /// (`notifications/channel`, `notifications/claude/channel`, or
+    /// `notifications/message` with `toSession: true`) are surfaced as
+    /// external input in the active interactive session.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub surface_notifications: bool,
 }
 
 impl McpServerConfig {
@@ -268,6 +275,8 @@ pub struct RawMcpServerConfig {
     pub _name: Option<String>,
     #[serde(default)]
     pub tools: Option<HashMap<String, McpServerToolConfig>>,
+    #[serde(default)]
+    pub surface_notifications: Option<bool>,
 }
 
 impl TryFrom<RawMcpServerConfig> for McpServerConfig {
@@ -300,6 +309,7 @@ impl TryFrom<RawMcpServerConfig> for McpServerConfig {
             oauth_resource,
             _name: _,
             tools,
+            surface_notifications,
         } = raw;
 
         let startup_timeout_sec = match (startup_timeout_sec, startup_timeout_ms) {
@@ -375,6 +385,7 @@ impl TryFrom<RawMcpServerConfig> for McpServerConfig {
             oauth,
             oauth_resource,
             tools: tools.unwrap_or_default(),
+            surface_notifications: surface_notifications.unwrap_or(false),
         })
     }
 }
