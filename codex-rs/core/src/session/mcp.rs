@@ -304,7 +304,7 @@ impl Session {
     }
 
     async fn refresh_mcp_servers_inner(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         mcp_servers: HashMap<String, McpServerConfig>,
         store_mode: OAuthCredentialsStoreMode,
@@ -347,27 +347,15 @@ impl Session {
             cancellation_token
         };
         let on_channel_notification: Option<codex_rmcp_client::OnChannelNotification> = {
-            let tx_sub = self.tx_sub.clone();
+            let sess_weak = std::sync::Arc::downgrade(self);
             Some(std::sync::Arc::new(move |notification: codex_protocol::channel_notification::ChannelNotification| {
-                let tx_sub = tx_sub.clone();
-                let xml = notification.to_xml();
+                let sess_weak = sess_weak.clone();
                 tokio::spawn(async move {
-                    let sub = codex_protocol::protocol::Submission {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        op: codex_protocol::protocol::Op::UserInput {
-                            items: vec![codex_protocol::user_input::UserInput::Text {
-                                text: xml,
-                                text_elements: vec![],
-                            }],
-                            final_output_json_schema: None,
-                            responsesapi_client_metadata: None,
-                            additional_context: Default::default(),
-                            thread_settings: Default::default(),
-                        },
-                        client_user_message_id: None,
-                        trace: None,
+                    let Some(sess) = sess_weak.upgrade() else {
+                        return;
                     };
-                    let _ = tx_sub.send(sub).await;
+                    sess.input_queue.enqueue_channel_input(notification).await;
+                    sess.maybe_start_turn_for_pending_work().await;
                 });
             }))
         };
@@ -406,7 +394,7 @@ impl Session {
     }
 
     pub(crate) async fn refresh_mcp_servers_if_requested(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         elicitation_reviewer: Option<ElicitationReviewerHandle>,
     ) {
@@ -486,7 +474,7 @@ impl Session {
     }
 
     pub(crate) async fn refresh_mcp_servers_now(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         mcp_servers: HashMap<String, McpServerConfig>,
         store_mode: OAuthCredentialsStoreMode,

@@ -4967,7 +4967,6 @@ async fn session_new_fails_when_zsh_fork_enabled_without_packaged_zsh() {
     };
 
     let (tx_event, _rx_event) = async_channel::unbounded();
-    let (tx_sub, _rx_sub) = async_channel::bounded(16);
     let (agent_status_tx, _agent_status_rx) = watch::channel(AgentStatus::PendingInit);
     let plugins_manager = Arc::new(PluginsManager::new(config.codex_home.to_path_buf()));
     let mcp_manager = Arc::new(McpManager::new(Arc::clone(&plugins_manager)));
@@ -4985,7 +4984,6 @@ async fn session_new_fails_when_zsh_fork_enabled_without_packaged_zsh() {
         models_manager,
         Arc::new(ExecPolicyManager::default()),
         tx_event,
-        tx_sub,
         agent_status_tx,
         InitialHistory::New,
         SessionSource::Exec,
@@ -5326,7 +5324,6 @@ async fn make_session_with_config_and_rx(
     };
 
     let (tx_event, rx_event) = async_channel::unbounded();
-    let (tx_sub, _rx_sub) = async_channel::bounded(16);
     let (agent_status_tx, _agent_status_rx) = watch::channel(AgentStatus::PendingInit);
     let plugins_manager = Arc::new(PluginsManager::new(config.codex_home.to_path_buf()));
     let mcp_manager = Arc::new(McpManager::new(Arc::clone(&plugins_manager)));
@@ -5345,7 +5342,6 @@ async fn make_session_with_config_and_rx(
         models_manager,
         Arc::new(ExecPolicyManager::default()),
         tx_event,
-        tx_sub,
         agent_status_tx,
         InitialHistory::New,
         SessionSource::Exec,
@@ -5434,7 +5430,6 @@ async fn make_session_with_history_source_and_agent_control_and_rx(
     };
 
     let (tx_event, rx_event) = async_channel::unbounded();
-    let (tx_sub, _rx_sub) = async_channel::bounded(16);
     let (agent_status_tx, _agent_status_rx) = watch::channel(AgentStatus::PendingInit);
     let plugins_manager = Arc::new(PluginsManager::new(config.codex_home.to_path_buf()));
     let mcp_manager = Arc::new(McpManager::new(Arc::clone(&plugins_manager)));
@@ -5453,7 +5448,6 @@ async fn make_session_with_history_source_and_agent_control_and_rx(
         models_manager,
         Arc::new(ExecPolicyManager::default()),
         tx_event,
-        tx_sub,
         agent_status_tx,
         initial_history,
         session_source,

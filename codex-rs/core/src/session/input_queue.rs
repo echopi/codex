@@ -1,6 +1,7 @@
 use crate::state::ActiveTurn;
 use crate::state::MailboxDeliveryPhase;
 use crate::state::TurnState;
+use codex_protocol::channel_notification::ChannelNotification;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::InterAgentCommunication;
 use codex_protocol::user_input::UserInput;
@@ -35,6 +36,7 @@ pub(crate) struct TurnInputQueue {
 pub(crate) struct InputQueue {
     activity_tx: watch::Sender<InputQueueActivity>,
     mailbox_pending_mails: Mutex<VecDeque<InterAgentCommunication>>,
+    channel_pending: Mutex<VecDeque<ChannelNotification>>,
 }
 
 impl InputQueue {
@@ -43,6 +45,7 @@ impl InputQueue {
         Self {
             activity_tx,
             mailbox_pending_mails: Mutex::new(VecDeque::new()),
+            channel_pending: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -90,6 +93,33 @@ impl InputQueue {
             .await
             .iter()
             .any(|mail| mail.trigger_turn)
+    }
+
+    pub(crate) async fn enqueue_channel_input(&self, notification: ChannelNotification) {
+        self.channel_pending.lock().await.push_back(notification);
+        self.activity_tx.send_replace(InputQueueActivity::Mailbox);
+    }
+
+    pub(crate) async fn has_pending_channel_items(&self) -> bool {
+        !self.channel_pending.lock().await.is_empty()
+    }
+
+    pub(crate) async fn drain_channel_input_items(&self) -> Vec<TurnInput> {
+        self.channel_pending
+            .lock()
+            .await
+            .drain(..)
+            .map(|n| {
+                let xml = n.to_xml();
+                TurnInput::UserInput {
+                    content: vec![UserInput::Text {
+                        text: xml,
+                        text_elements: vec![],
+                    }],
+                    client_id: None,
+                }
+            })
+            .collect()
     }
 
     pub(crate) async fn drain_mailbox_input_items(&self) -> Vec<TurnInput> {
@@ -215,11 +245,13 @@ impl InputQueue {
             return pending_input;
         }
         let mailbox_items = self.drain_mailbox_input_items().await.into_iter();
+        let channel_items = self.drain_channel_input_items().await.into_iter();
         if pending_input.is_empty() {
-            mailbox_items.collect()
+            mailbox_items.chain(channel_items).collect()
         } else {
             let mut pending_input = pending_input;
             pending_input.extend(mailbox_items);
+            pending_input.extend(channel_items);
             pending_input
         }
     }
@@ -248,7 +280,10 @@ impl InputQueue {
         if !accepts_mailbox_delivery {
             return false;
         }
-        self.has_pending_mailbox_items().await
+        if self.has_pending_mailbox_items().await {
+            return true;
+        }
+        self.has_pending_channel_items().await
     }
 }
 

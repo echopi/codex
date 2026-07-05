@@ -668,7 +668,6 @@ impl Codex {
             models_manager.clone(),
             exec_policy,
             tx_event.clone(),
-            tx_sub.clone(),
             agent_status_tx.clone(),
             conversation_history,
             session_source_clone,
