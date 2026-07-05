@@ -27,6 +27,7 @@ pub(crate) struct Session {
     pub(crate) thread_id: ThreadId,
     pub(crate) installation_id: String,
     pub(super) tx_event: Sender<Event>,
+    pub(super) tx_sub: Sender<Submission>,
     pub(super) agent_status: watch::Sender<AgentStatus>,
     pub(super) out_of_band_elicitation_paused: watch::Sender<bool>,
     pub(super) state: Mutex<SessionState>,
@@ -478,6 +479,7 @@ impl Session {
         models_manager: SharedModelsManager,
         exec_policy: Arc<ExecPolicyManager>,
         tx_event: Sender<Event>,
+        tx_sub: Sender<Submission>,
         agent_status: watch::Sender<AgentStatus>,
         initial_history: InitialHistory,
         session_source: SessionSource,
@@ -1077,6 +1079,7 @@ impl Session {
                 thread_id,
                 installation_id,
                 tx_event: tx_event.clone(),
+                tx_sub: tx_sub.clone(),
                 agent_status,
                 out_of_band_elicitation_paused,
                 state: Mutex::new(state),
@@ -1164,6 +1167,31 @@ impl Session {
                     cwd,
                 )
             };
+            let on_channel_notification: Option<codex_rmcp_client::OnChannelNotification> = {
+                let tx_sub = sess.tx_sub.clone();
+                Some(std::sync::Arc::new(move |notification: codex_protocol::channel_notification::ChannelNotification| {
+                    let tx_sub = tx_sub.clone();
+                    let xml = notification.to_xml();
+                    tokio::spawn(async move {
+                        let sub = codex_protocol::protocol::Submission {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            op: codex_protocol::protocol::Op::UserInput {
+                                items: vec![codex_protocol::user_input::UserInput::Text {
+                                    text: xml,
+                                    text_elements: vec![],
+                                }],
+                                final_output_json_schema: None,
+                                responsesapi_client_metadata: None,
+                                additional_context: Default::default(),
+                                thread_settings: Default::default(),
+                            },
+                            client_user_message_id: None,
+                            trace: None,
+                        };
+                        let _ = tx_sub.send(sub).await;
+                    });
+                }))
+            };
             let mcp_connection_manager = McpConnectionManager::new(
                 &mcp_servers,
                 config.mcp_oauth_credentials_store_mode,
@@ -1186,6 +1214,7 @@ impl Session {
                 tool_plugin_provenance,
                 auth,
                 Some(sess.mcp_elicitation_reviewer()),
+                on_channel_notification,
             )
             .instrument(info_span!(
                 "session_init.mcp_manager_init",

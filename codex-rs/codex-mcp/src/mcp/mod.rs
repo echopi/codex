@@ -309,6 +309,7 @@ pub async fn read_mcp_resource(
         tool_plugin_provenance(config),
         auth,
         /*elicitation_reviewer*/ None,
+        /*on_channel_notification*/ None,
     )
     .await;
 
@@ -384,6 +385,7 @@ pub async fn collect_mcp_server_status_snapshot_with_detail(
         tool_plugin_provenance,
         auth,
         /*elicitation_reviewer*/ None,
+        /*on_channel_notification*/ None,
     )
     .await;
 
@@ -502,6 +504,7 @@ fn mcp_server_config_for_url(url: String, apps_mcp_product_sku: Option<&str>) ->
         oauth: None,
         oauth_resource: None,
         tools: HashMap::new(),
+        surface_notifications: false,
     }
 }
 

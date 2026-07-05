@@ -377,6 +377,7 @@ fn mcp_dependency_to_server_config(
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         });
     }
 
@@ -407,6 +408,7 @@ fn mcp_dependency_to_server_config(
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         });
     }
 

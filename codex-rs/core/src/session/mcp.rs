@@ -346,6 +346,31 @@ impl Session {
             *guard = cancellation_token.clone();
             cancellation_token
         };
+        let on_channel_notification: Option<codex_rmcp_client::OnChannelNotification> = {
+            let tx_sub = self.tx_sub.clone();
+            Some(std::sync::Arc::new(move |notification: codex_protocol::channel_notification::ChannelNotification| {
+                let tx_sub = tx_sub.clone();
+                let xml = notification.to_xml();
+                tokio::spawn(async move {
+                    let sub = codex_protocol::protocol::Submission {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        op: codex_protocol::protocol::Op::UserInput {
+                            items: vec![codex_protocol::user_input::UserInput::Text {
+                                text: xml,
+                                text_elements: vec![],
+                            }],
+                            final_output_json_schema: None,
+                            responsesapi_client_metadata: None,
+                            additional_context: Default::default(),
+                            thread_settings: Default::default(),
+                        },
+                        client_user_message_id: None,
+                        trace: None,
+                    };
+                    let _ = tx_sub.send(sub).await;
+                });
+            }))
+        };
         let refreshed_manager = McpConnectionManager::new(
             &mcp_servers,
             store_mode,
@@ -368,6 +393,7 @@ impl Session {
             tool_plugin_provenance,
             auth.as_ref(),
             elicitation_reviewer,
+            on_channel_notification,
         )
         .await;
         {
