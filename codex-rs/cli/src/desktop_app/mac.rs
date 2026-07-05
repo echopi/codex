@@ -338,7 +338,7 @@ mod tests {
                 url.query_pairs().into_owned().collect::<Vec<_>>(),
             ),
             (
-                "codex".to_string(),
+                "cdx".to_string(),
                 Some("threads".to_string()),
                 "/new".to_string(),
                 vec![("path".to_string(), "/tmp/codex workspace/#1".to_string())],

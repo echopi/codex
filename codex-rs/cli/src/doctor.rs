@@ -1038,9 +1038,9 @@ fn display_list<T: AsRef<str>>(items: &[T]) -> String {
 
 fn codex_path_entries() -> Vec<String> {
     #[cfg(windows)]
-    let result = run_command("where", ["codex"]);
+    let result = run_command("where", ["cdx"]);
     #[cfg(not(windows))]
-    let result = run_command("which", ["-a", "codex"]);
+    let result = run_command("which", ["-a", "cdx"]);
 
     result
         .unwrap_or_default()

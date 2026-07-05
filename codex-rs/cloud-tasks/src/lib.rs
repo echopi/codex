@@ -564,7 +564,7 @@ async fn run_list_command(args: crate::cli::ListCommand) -> anyhow::Result<()> {
         println!("{line}");
     }
     if let Some(cursor) = page.cursor {
-        let command = format!("codex cloud list --cursor='{cursor}'");
+        let command = format!("cdx cloud list --cursor='{cursor}'");
         if colorize {
             println!(
                 "\nTo fetch the next page, run {}",
