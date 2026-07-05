@@ -901,6 +901,7 @@ fn blocking_replace_mcp_servers_round_trips() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
@@ -933,6 +934,7 @@ fn blocking_replace_mcp_servers_round_trips() {
             }),
             oauth_resource: Some("https://resource.example.com".to_string()),
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
@@ -1007,6 +1009,7 @@ fn blocking_replace_mcp_servers_serializes_tool_approval_overrides() {
                     approval_mode: Some(AppToolApproval::Approve),
                 },
             )]),
+            surface_notifications: false,
         },
     );
 
@@ -1062,6 +1065,7 @@ foo = { command = "cmd" }
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
@@ -1112,6 +1116,7 @@ foo = { command = "cmd" } # keep me
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
@@ -1161,6 +1166,7 @@ foo = { command = "cmd", args = ["--flag"] } # keep me
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
@@ -1211,6 +1217,7 @@ foo = { command = "cmd" }
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         },
     );
 
