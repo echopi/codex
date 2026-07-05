@@ -452,4 +452,73 @@ mod tests {
             .await;
         assert!(input_queue.has_trigger_turn_mailbox_items().await);
     }
+
+    fn make_channel_notification(msg_id: &str, content: &str) -> ChannelNotification {
+        ChannelNotification {
+            server_name: "dingtalk".to_string(),
+            source: "dingtalk".to_string(),
+            conversation_id: Some("cid1".to_string()),
+            conversation_type: Some("direct".to_string()),
+            sender: Some("tester".to_string()),
+            sender_id: None,
+            msg_id: msg_id.to_string(),
+            timestamp: None,
+            content: content.to_string(),
+        }
+    }
+
+    fn turn_input_text(input: &TurnInput) -> Option<&str> {
+        match input {
+            TurnInput::UserInput { content, .. } => content.iter().find_map(|item| match item {
+                UserInput::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            }),
+            _ => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn input_queue_drains_channel_items_after_mailbox() {
+        let input_queue = InputQueue::new();
+        input_queue
+            .enqueue_channel_input(make_channel_notification("m1", "hello from dingtalk"))
+            .await;
+        input_queue
+            .enqueue_mailbox_communication(make_mail(
+                AgentPath::root(),
+                AgentPath::try_from("/root/worker").expect("agent path"),
+                "mail first",
+                /*trigger_turn*/ false,
+            ))
+            .await;
+
+        let active_turn = Mutex::new(None);
+        let items = input_queue.get_pending_input(&active_turn).await;
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], TurnInput::InterAgentCommunication(_)));
+        let channel_text = turn_input_text(&items[1]).expect("channel item is user input text");
+        assert!(channel_text.starts_with("<channel "));
+        assert!(channel_text.contains(r#"source="dingtalk""#));
+        assert!(channel_text.contains(r#"msg_id="m1""#));
+        assert!(channel_text.contains("hello from dingtalk"));
+    }
+
+    #[tokio::test]
+    async fn input_queue_channel_items_wake_idle_session_and_drain_once() {
+        let input_queue = InputQueue::new();
+        let active_turn = Mutex::new(None);
+        assert!(!input_queue.has_pending_input(&active_turn).await);
+
+        input_queue
+            .enqueue_channel_input(make_channel_notification("m2", "ping"))
+            .await;
+        assert!(input_queue.has_pending_channel_items().await);
+        assert!(input_queue.has_pending_input(&active_turn).await);
+
+        let items = input_queue.get_pending_input(&active_turn).await;
+        assert_eq!(items.len(), 1);
+        assert!(!input_queue.has_pending_channel_items().await);
+        assert!(!input_queue.has_pending_input(&active_turn).await);
+        assert!(input_queue.get_pending_input(&active_turn).await.is_empty());
+    }
 }
