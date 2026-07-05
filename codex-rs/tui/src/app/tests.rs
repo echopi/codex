@@ -6250,3 +6250,30 @@ async fn side_backtrack_rejection_reports_unavailable_message_snapshot() {
 async fn start_config_write_test_app_server(app: &App) -> Result<AppServerSession> {
     Box::pin(crate::start_embedded_app_server_for_picker(&app.config)).await
 }
+
+#[tokio::test]
+async fn btw_turn_completion_marks_state_and_keeps_side_thread() {
+    let mut app = make_test_app().await;
+    let parent_thread_id = ThreadId::new();
+    let side_thread_id = ThreadId::new();
+    app.primary_thread_id = Some(parent_thread_id);
+    app.active_thread_id = Some(side_thread_id);
+    app.side_threads
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, true));
+
+    app.mark_active_btw_completed();
+
+    let state = app
+        .side_threads
+        .get(&side_thread_id)
+        .expect("btw side thread is kept after completion");
+    assert!(state.btw_completed);
+
+    // Non-btw side threads are unaffected by completion marking.
+    let plain_side_id = ThreadId::new();
+    app.active_thread_id = Some(plain_side_id);
+    app.side_threads
+        .insert(plain_side_id, SideThreadState::new(parent_thread_id, false));
+    app.mark_active_btw_completed();
+    assert!(!app.side_threads[&plain_side_id].btw_completed);
+}

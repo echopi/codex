@@ -215,6 +215,8 @@ pub(super) struct SideThreadState {
     pub(super) parent_status: Option<SideParentStatus>,
     /// Whether this side thread is a /btw ephemeral quick question.
     pub(super) btw_mode: bool,
+    /// Whether the /btw question's turn has completed (answer ready to read).
+    pub(super) btw_completed: bool,
 }
 
 impl SideThreadState {
@@ -223,6 +225,7 @@ impl SideThreadState {
             parent_thread_id,
             parent_status: None,
             btw_mode,
+            btw_completed: false,
         }
     }
 }
@@ -239,10 +242,17 @@ impl App {
             clear_side_ui(&mut self.chat_widget);
             return;
         };
-        let Some((parent_thread_id, parent_status, btw_mode)) = self
+        let Some((parent_thread_id, parent_status, btw_mode, btw_completed)) = self
             .side_threads
             .get(&active_thread_id)
-            .map(|state| (state.parent_thread_id, state.parent_status, state.btw_mode))
+            .map(|state| {
+                (
+                    state.parent_thread_id,
+                    state.parent_status,
+                    state.btw_mode,
+                    state.btw_completed,
+                )
+            })
         else {
             clear_side_ui(&mut self.chat_widget);
             return;
@@ -256,8 +266,13 @@ impl App {
             .set_interrupted_turn_notice_mode(InterruptedTurnNoticeMode::Suppress);
 
         if btw_mode {
+            let label = if btw_completed {
+                "[btw] ✓ done · Ctrl+C to return"
+            } else {
+                "[btw] ephemeral · no tools · Ctrl+C to return"
+            };
             self.chat_widget
-                .set_side_conversation_context_label(Some("[btw] ephemeral · no tools · Ctrl+C to return".to_string()));
+                .set_side_conversation_context_label(Some(label.to_string()));
         } else {
             let mut label_parts = Vec::new();
             let parent_is_main = self.primary_thread_id == Some(parent_thread_id);
@@ -339,6 +354,22 @@ impl App {
                 self.clear_side_parent_action_status(parent_thread_id);
             }
         }
+    }
+
+    /// Marks the active /btw side thread's turn as completed so the UI can
+    /// hold on the answer until the user returns manually (Ctrl+C).
+    pub(super) fn mark_active_btw_completed(&mut self) {
+        let Some(active_thread_id) = self.active_thread_id else {
+            return;
+        };
+        let Some(state) = self.side_threads.get_mut(&active_thread_id) else {
+            return;
+        };
+        if !state.btw_mode || state.btw_completed {
+            return;
+        }
+        state.btw_completed = true;
+        self.sync_side_thread_ui();
     }
 
     pub(super) async fn maybe_return_from_side(

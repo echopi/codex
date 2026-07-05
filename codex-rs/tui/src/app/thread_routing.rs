@@ -1463,7 +1463,7 @@ impl App {
             self.refresh_status_line();
         }
         if is_btw_turn_completed {
-            self.app_event_tx.send(AppEvent::BtwAutoReturn);
+            self.app_event_tx.send(AppEvent::BtwTurnCompleted);
         }
     }
 
