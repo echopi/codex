@@ -1430,6 +1430,13 @@ impl App {
             ThreadBufferedEvent::Notification(ServerNotification::TurnStarted(_))
                 | ThreadBufferedEvent::Notification(ServerNotification::ThreadTokenUsageUpdated(_))
         );
+        let is_btw_turn_completed = matches!(
+            &event,
+            ThreadBufferedEvent::Notification(ServerNotification::TurnCompleted(n))
+                if matches!(n.turn.status, TurnStatus::Completed)
+                    && self.active_thread_id.is_some()
+                    && self.side_threads.get(&self.active_thread_id.unwrap()).is_some_and(|s| s.btw_mode)
+        );
         match event {
             ThreadBufferedEvent::Notification(notification) => {
                 self.cache_collab_receiver_threads_for_notification(&notification);
@@ -1454,6 +1461,9 @@ impl App {
         }
         if needs_refresh {
             self.refresh_status_line();
+        }
+        if is_btw_turn_completed {
+            self.app_event_tx.send(AppEvent::BtwAutoReturn);
         }
     }
 

@@ -121,9 +121,8 @@ impl SlashCommand {
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Agent | SlashCommand::MultiAgents => "switch the active agent thread",
-            SlashCommand::Side | SlashCommand::Btw => {
-                "start a side conversation in an ephemeral fork"
-            }
+            SlashCommand::Side => "start a side conversation in an ephemeral fork",
+            SlashCommand::Btw => "ask a quick question without affecting history",
             SlashCommand::Permissions => "choose what Codex is allowed to do",
             SlashCommand::Keymap => "remap TUI shortcuts",
             SlashCommand::Vim => "toggle Vim mode for the composer",

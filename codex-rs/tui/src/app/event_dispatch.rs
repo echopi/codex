@@ -1829,10 +1829,18 @@ impl App {
             AppEvent::StartSide {
                 parent_thread_id,
                 user_message,
+                btw_mode,
             } => {
                 return self
-                    .handle_start_side(tui, app_server, parent_thread_id, user_message)
+                    .handle_start_side(tui, app_server, parent_thread_id, user_message, btw_mode)
                     .await;
+            }
+            AppEvent::BtwAutoReturn => {
+                if let Some(parent_thread_id) = self.active_side_parent_thread_id() {
+                    let _ = self
+                        .select_agent_thread_and_discard_side(tui, app_server, parent_thread_id)
+                        .await;
+                }
             }
             AppEvent::OpenSkillsList => {
                 self.chat_widget.open_skills_list();

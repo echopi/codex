@@ -263,6 +263,7 @@ async fn slash_side_without_args_starts_empty_side_conversation() {
         Ok(AppEvent::StartSide {
             parent_thread_id: emitted_parent_thread_id,
             user_message: None,
+            btw_mode: false,
         }) if emitted_parent_thread_id == parent_thread_id
     );
     assert!(
@@ -288,6 +289,7 @@ async fn slash_btw_without_args_starts_empty_side_conversation() {
         Ok(AppEvent::StartSide {
             parent_thread_id: emitted_parent_thread_id,
             user_message: None,
+            btw_mode: true,
         }) if emitted_parent_thread_id == parent_thread_id
     );
     assert!(
@@ -319,6 +321,7 @@ async fn slash_side_requests_forked_side_question_while_task_running() {
         Ok(AppEvent::StartSide {
             parent_thread_id: emitted_parent_thread_id,
             user_message: Some(user_message),
+            btw_mode: false,
         }) if emitted_parent_thread_id == parent_thread_id
             && user_message
                 == UserMessage {
@@ -365,6 +368,7 @@ async fn slash_btw_requests_forked_side_question_while_task_running() {
         Ok(AppEvent::StartSide {
             parent_thread_id: emitted_parent_thread_id,
             user_message: Some(user_message),
+            btw_mode: true,
         }) if emitted_parent_thread_id == parent_thread_id
             && user_message
                 == UserMessage {

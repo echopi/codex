@@ -105,12 +105,19 @@ impl ChatWidget {
         &mut self,
         parent_thread_id: ThreadId,
         user_message: Option<UserMessage>,
+        btw_mode: bool,
     ) {
-        self.set_side_conversation_context_label(Some(SIDE_STARTING_CONTEXT_LABEL.to_string()));
+        let label = if btw_mode {
+            "[btw] starting...".to_string()
+        } else {
+            SIDE_STARTING_CONTEXT_LABEL.to_string()
+        };
+        self.set_side_conversation_context_label(Some(label));
         self.request_redraw();
         self.app_event_tx.send(AppEvent::StartSide {
             parent_thread_id,
             user_message,
+            btw_mode,
         });
     }
 
@@ -123,7 +130,8 @@ impl ChatWidget {
             return;
         };
 
-        self.request_side_conversation(parent_thread_id, /*user_message*/ None);
+        let btw_mode = matches!(cmd, SlashCommand::Btw);
+        self.request_side_conversation(parent_thread_id, /*user_message*/ None, btw_mode);
     }
 
     fn emit_raw_output_mode_changed(&self, enabled: bool) {
@@ -848,7 +856,7 @@ impl ChatWidget {
                     self.clear_live_goal_submission();
                 }
             }
-            SlashCommand::Side | SlashCommand::Btw if !trimmed.is_empty() => {
+            SlashCommand::Side if !trimmed.is_empty() => {
                 let Some(parent_thread_id) = self.thread_id else {
                     let command = cmd.command();
                     self.add_error_message(format!(
@@ -864,7 +872,24 @@ impl ChatWidget {
                     mention_bindings,
                     source,
                 );
-                self.request_side_conversation(parent_thread_id, Some(user_message));
+                self.request_side_conversation(parent_thread_id, Some(user_message), false);
+            }
+            SlashCommand::Btw if !trimmed.is_empty() => {
+                let Some(parent_thread_id) = self.thread_id else {
+                    self.add_error_message(
+                        "'/btw' is unavailable before the session starts.".to_string(),
+                    );
+                    return;
+                };
+                let user_message = self.prepared_inline_user_message(
+                    args,
+                    text_elements,
+                    local_images,
+                    remote_image_urls,
+                    mention_bindings,
+                    source,
+                );
+                self.request_side_conversation(parent_thread_id, Some(user_message), true);
             }
             SlashCommand::Review if !trimmed.is_empty() => {
                 self.submit_op(AppCommand::review(ReviewTarget::Custom {

@@ -2286,7 +2286,7 @@ async fn side_defers_parent_approval_overlay_until_parent_replay() -> Result<()>
     app.primary_thread_id = Some(parent_thread_id);
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
     app.thread_event_channels.insert(
         parent_thread_id,
         ThreadEventChannel::new_with_session(
@@ -2393,7 +2393,7 @@ async fn side_defers_subagent_approval_overlay_until_side_exits() -> Result<()> 
     app.primary_thread_id = Some(main_thread_id);
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(main_thread_id));
+        .insert(side_thread_id, SideThreadState::new(main_thread_id, false));
     app.thread_event_channels.insert(
         agent_thread_id,
         ThreadEventChannel::new_with_session(
@@ -3229,7 +3229,7 @@ async fn side_start_block_message_tracks_open_side_conversation() {
     let parent_thread_id = ThreadId::new();
     let side_thread_id = ThreadId::new();
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     assert_eq!(
         app.side_start_block_message(),
@@ -3250,7 +3250,7 @@ async fn side_parent_status_tracks_parent_turn_lifecycle() -> Result<()> {
     app.primary_thread_id = Some(parent_thread_id);
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     app.enqueue_thread_notification(
         parent_thread_id,
@@ -3299,7 +3299,7 @@ async fn side_parent_status_prioritizes_input_over_approval() -> Result<()> {
     app.primary_thread_id = Some(parent_thread_id);
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     app.enqueue_thread_request(
         parent_thread_id,
@@ -3405,7 +3405,7 @@ async fn side_thread_snapshot_does_not_refresh_from_fork_history() {
     let parent_thread_id = ThreadId::new();
     let side_thread_id = ThreadId::new();
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     let snapshot = ThreadEventSnapshot {
         session: Some(ThreadSessionState {
@@ -3433,7 +3433,7 @@ async fn side_thread_snapshot_skips_session_header_preamble() {
     let side_thread_id = ThreadId::new();
     app.primary_thread_id = Some(parent_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     let snapshot = ThreadEventSnapshot {
         session: Some(ThreadSessionState {
@@ -3598,7 +3598,7 @@ async fn active_side_thread_renders_live_mcp_startup_notifications() {
     let side_thread_id = ThreadId::new();
     app.primary_thread_id = Some(parent_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
     app.ensure_thread_channel(side_thread_id);
     app.activate_thread_channel(side_thread_id).await;
     app.replay_thread_snapshot(
@@ -3683,7 +3683,7 @@ async fn side_discard_selection_keeps_current_side_thread() {
     let side_thread_id = ThreadId::new();
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
 
     assert_eq!(
         app.side_thread_to_discard_after_switch(side_thread_id),
@@ -3706,7 +3706,7 @@ async fn discard_side_thread_removes_agent_navigation_entry() -> Result<()> {
         let started = app_server.start_thread(&side_config).await?;
         let side_thread_id = started.session.thread_id;
         app.side_threads
-            .insert(side_thread_id, SideThreadState::new(ThreadId::new()));
+            .insert(side_thread_id, SideThreadState::new(ThreadId::new(), false));
         app.agent_navigation.upsert(
             side_thread_id,
             Some("Side".to_string()),
@@ -3736,7 +3736,7 @@ async fn discard_side_thread_keeps_local_state_when_server_close_fails() -> Resu
         let side_thread_id = ThreadId::new();
         app.active_thread_id = Some(side_thread_id);
         app.side_threads
-            .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+            .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
         app.agent_navigation.upsert(
             side_thread_id,
             Some("Side".to_string()),
@@ -3769,7 +3769,7 @@ async fn discard_closed_side_thread_removes_local_state_without_server_rpc() {
     let side_thread_id = ThreadId::new();
     app.active_thread_id = Some(side_thread_id);
     app.side_threads
-        .insert(side_thread_id, SideThreadState::new(parent_thread_id));
+        .insert(side_thread_id, SideThreadState::new(parent_thread_id, false));
     app.thread_event_channels
         .insert(side_thread_id, ThreadEventChannel::new(/*capacity*/ 4));
     app.agent_navigation.upsert(

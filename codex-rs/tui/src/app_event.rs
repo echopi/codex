@@ -153,7 +153,11 @@ pub(crate) enum AppEvent {
     StartSide {
         parent_thread_id: ThreadId,
         user_message: Option<UserMessage>,
+        btw_mode: bool,
     },
+
+    /// Auto-return from a /btw ephemeral side conversation after the first turn completes.
+    BtwAutoReturn,
 
     /// Submit an op to the specified thread, regardless of current focus.
     SubmitThreadOp {

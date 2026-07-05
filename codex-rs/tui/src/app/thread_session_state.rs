@@ -229,7 +229,7 @@ mod tests {
             ),
         );
         app.side_threads
-            .insert(side_thread_id, SideThreadState::new(main_thread_id));
+            .insert(side_thread_id, SideThreadState::new(main_thread_id, false));
         app.config.permissions.approval_policy =
             codex_config::Constrained::allow_any(AskForApproval::OnRequest.to_core());
         app.config.approvals_reviewer = ApprovalsReviewer::AutoReview;

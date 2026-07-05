@@ -51,6 +51,12 @@ You may perform non-mutating inspection, including reading or searching files an
 
 Do not modify files, source, git state, permissions, configuration, or any other workspace state unless the user explicitly requests that mutation in this side conversation. Do not request escalated permissions or broader sandbox access unless the user explicitly requests a mutation that requires it. If the user explicitly requests a mutation, keep it minimal, local to the request, and avoid disrupting the main thread."#;
 
+const BTW_DEVELOPER_INSTRUCTIONS: &str = r#"You are in a /btw quick question mode.
+
+This is a lightweight, ephemeral question — answer it directly from your knowledge and the inherited context. Do NOT use any tools, do NOT make any tool calls, do NOT read files, do NOT execute commands, do NOT modify anything. Answer purely from what you already know.
+
+Keep your answer concise and focused. After answering, you are done — the user will automatically return to their main conversation."#;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum SideParentStatus {
     NeedsInput,
@@ -207,13 +213,16 @@ pub(super) struct SideThreadState {
     pub(super) parent_thread_id: ThreadId,
     /// Parent-thread condition that changed while this side thread is visible.
     pub(super) parent_status: Option<SideParentStatus>,
+    /// Whether this side thread is a /btw ephemeral quick question.
+    pub(super) btw_mode: bool,
 }
 
 impl SideThreadState {
-    pub(super) fn new(parent_thread_id: ThreadId) -> Self {
+    pub(super) fn new(parent_thread_id: ThreadId, btw_mode: bool) -> Self {
         Self {
             parent_thread_id,
             parent_status: None,
+            btw_mode,
         }
     }
 }
@@ -230,10 +239,10 @@ impl App {
             clear_side_ui(&mut self.chat_widget);
             return;
         };
-        let Some((parent_thread_id, parent_status)) = self
+        let Some((parent_thread_id, parent_status, btw_mode)) = self
             .side_threads
             .get(&active_thread_id)
-            .map(|state| (state.parent_thread_id, state.parent_status))
+            .map(|state| (state.parent_thread_id, state.parent_status, state.btw_mode))
         else {
             clear_side_ui(&mut self.chat_widget);
             return;
@@ -245,20 +254,26 @@ impl App {
             .set_side_conversation_active(/*active*/ true);
         self.chat_widget
             .set_interrupted_turn_notice_mode(InterruptedTurnNoticeMode::Suppress);
-        let mut label_parts = Vec::new();
-        let parent_is_main = self.primary_thread_id == Some(parent_thread_id);
-        if parent_is_main {
-            label_parts.push("from main thread".to_string());
+
+        if btw_mode {
+            self.chat_widget
+                .set_side_conversation_context_label(Some("[btw] ephemeral · no tools · Ctrl+C to return".to_string()));
         } else {
-            let parent_label = self.thread_label(parent_thread_id);
-            label_parts.push(format!("from parent thread ({parent_label})"));
+            let mut label_parts = Vec::new();
+            let parent_is_main = self.primary_thread_id == Some(parent_thread_id);
+            if parent_is_main {
+                label_parts.push("from main thread".to_string());
+            } else {
+                let parent_label = self.thread_label(parent_thread_id);
+                label_parts.push(format!("from parent thread ({parent_label})"));
+            }
+            if let Some(parent_status) = parent_status {
+                label_parts.push(parent_status.label(parent_is_main).to_string());
+            }
+            label_parts.push("Ctrl+C to return".to_string());
+            self.chat_widget
+                .set_side_conversation_context_label(Some(format!("Side {}", label_parts.join(" · "))));
         }
-        if let Some(parent_status) = parent_status {
-            label_parts.push(parent_status.label(parent_is_main).to_string());
-        }
-        label_parts.push("Ctrl+C to return".to_string());
-        self.chat_widget
-            .set_side_conversation_context_label(Some(format!("Side {}", label_parts.join(" · "))));
     }
 
     pub(super) fn active_side_parent_thread_id(&self) -> Option<ThreadId> {
@@ -481,6 +496,15 @@ impl App {
         fork_config
     }
 
+    pub(super) fn btw_fork_config(&self) -> Config {
+        let mut fork_config = self.side_fork_config();
+        let existing = fork_config.developer_instructions.take().unwrap_or_default();
+        fork_config.developer_instructions = Some(
+            format!("{existing}\n\n{BTW_DEVELOPER_INSTRUCTIONS}"),
+        );
+        fork_config
+    }
+
     pub(super) fn side_start_block_message(&self) -> Option<&'static str> {
         if self.primary_thread_id.is_none() {
             Some(SIDE_MAIN_THREAD_UNAVAILABLE_MESSAGE)
@@ -557,6 +581,7 @@ impl App {
         app_server: &mut AppServerSession,
         parent_thread_id: ThreadId,
         mut user_message: Option<crate::chatwidget::UserMessage>,
+        btw_mode: bool,
     ) -> Result<AppRunControl> {
         if let Some(message) = self.side_start_block_message() {
             self.restore_side_user_message(user_message.take());
@@ -565,15 +590,20 @@ impl App {
             return Ok(AppRunControl::Continue);
         }
 
+        let telemetry_source = if btw_mode { "btw_command" } else { "slash_command" };
         self.session_telemetry.counter(
             "codex.thread.side",
             /*inc*/ 1,
-            &[("source", "slash_command")],
+            &[("source", telemetry_source)],
         );
         self.refresh_in_memory_config_from_disk_best_effort("starting a side conversation")
             .await;
 
-        let fork_config = self.side_fork_config();
+        let fork_config = if btw_mode {
+            self.btw_fork_config()
+        } else {
+            self.side_fork_config()
+        };
         match app_server.fork_thread(fork_config, parent_thread_id).await {
             Ok(forked) => {
                 let child_thread_id = forked.session.thread_id;
@@ -583,7 +613,7 @@ impl App {
                     Self::install_side_thread_snapshot(&mut store, forked.session, forked.turns);
                 }
                 self.side_threads
-                    .insert(child_thread_id, SideThreadState::new(parent_thread_id));
+                    .insert(child_thread_id, SideThreadState::new(parent_thread_id, btw_mode));
                 if let Err(err) = app_server
                     .thread_inject_items(child_thread_id, vec![Self::side_boundary_prompt_item()])
                     .await
