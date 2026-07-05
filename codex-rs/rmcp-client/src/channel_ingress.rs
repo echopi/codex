@@ -19,6 +19,8 @@ const CHANNEL_METHOD: &str = "notifications/channel";
 const CLAUDE_CHANNEL_METHOD: &str = "notifications/claude/channel";
 const MESSAGE_METHOD: &str = "notifications/message";
 const DEFAULT_DEDUPE_TTL: Duration = Duration::from_secs(3600);
+/// Hard cap on tracked dedupe keys; oldest entries are evicted at capacity.
+const MAX_DEDUPE_ENTRIES: usize = 1024;
 
 /// Callback invoked when a validated, deduplicated channel notification is ready
 /// for ingress into the active session.
@@ -48,6 +50,14 @@ impl DedupeStore {
         if map.contains_key(key) {
             true
         } else {
+            if map.len() >= MAX_DEDUPE_ENTRIES
+                && let Some(oldest) = map
+                    .iter()
+                    .min_by_key(|(_, ts)| **ts)
+                    .map(|(k, _)| k.clone())
+            {
+                map.remove(&oldest);
+            }
             map.insert(key.to_string(), now);
             false
         }

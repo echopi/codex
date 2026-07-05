@@ -799,6 +799,16 @@ impl Session {
             return;
         }
         self.emit_thread_idle_lifecycle_if_idle().await;
+        // Channel or mailbox work enqueued while this turn was finishing hit
+        // the busy check in maybe_start_turn_for_pending_work and returned;
+        // without a recheck here it would sleep until the next user
+        // interaction. Spawned as a separate task to break the recursive
+        // future type chain (start_task → on_task_finished → maybe_start →
+        // start_task) that overflows rustc's query depth limit.
+        let sess = Arc::clone(self);
+        tokio::spawn(async move {
+            sess.maybe_start_turn_for_pending_work().await;
+        });
     }
 
     async fn take_active_turn(&self) -> Option<ActiveTurn> {

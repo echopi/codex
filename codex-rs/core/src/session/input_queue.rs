@@ -10,6 +10,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::watch;
 
+/// Maximum queued external channel notifications. Oldest entries are dropped
+/// first so the most recent messages win if an opted-in server floods.
+const MAX_PENDING_CHANNEL_ITEMS: usize = 64;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TurnInput {
     UserInput {
@@ -96,7 +100,19 @@ impl InputQueue {
     }
 
     pub(crate) async fn enqueue_channel_input(&self, notification: ChannelNotification) {
-        self.channel_pending.lock().await.push_back(notification);
+        {
+            let mut pending = self.channel_pending.lock().await;
+            while pending.len() >= MAX_PENDING_CHANNEL_ITEMS {
+                if let Some(dropped) = pending.pop_front() {
+                    tracing::warn!(
+                        msg_id = %dropped.msg_id,
+                        source = %dropped.source,
+                        "channel input queue full, dropping oldest notification"
+                    );
+                }
+            }
+            pending.push_back(notification);
+        }
         self.activity_tx.send_replace(InputQueueActivity::Mailbox);
     }
 
