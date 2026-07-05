@@ -1,0 +1,45 @@
+name: Sync upstream + rebase custom patches
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/openai/codex.git || true
+          git fetch upstream --tags
+
+      - name: Find latest stable tag
+        id: tag
+        run: |
+          TAG=$(git tag -l 'rust-v*' --sort=-v:refname | grep -v alpha | head -1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest stable tag: $TAG"
+
+      - name: Rebase custom onto new tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          CURRENT_BASE=$(git describe --tags --abbrev=0 $(git merge-base HEAD ${{ steps.tag.outputs.tag }}) 2>/dev/null || echo "")
+          if [ "$CURRENT_BASE" = "${{ steps.tag.outputs.tag }}" ]; then
+            echo "Already on latest tag $CURRENT_BASE, nothing to rebase."
+            exit 0
+          fi
+          echo "Rebasing custom from $CURRENT_BASE onto ${{ steps.tag.outputs.tag }}"
+          git rebase --onto ${{ steps.tag.outputs.tag }} $CURRENT_BASE custom
+
+      - name: Push
+        run: git push --force-with-lease origin custom
+
+      - name: Alert on conflict
+        if: failure()
+        run: echo "::error::Rebase conflict — manual intervention needed"
