@@ -425,12 +425,16 @@ impl RmcpClient {
         params: InitializeRequestParams,
         timeout: Option<Duration>,
         send_elicitation: SendElicitation,
+        channel_ingress: Option<crate::ChannelIngressConfig>,
     ) -> Result<InitializeResult> {
-        let client_service = ElicitationClientService::new(
+        let mut client_service = ElicitationClientService::new(
             params.clone(),
             send_elicitation,
             self.elicitation_pause_state.clone(),
         );
+        if let Some(config) = channel_ingress {
+            client_service.set_channel_ingress(config);
+        }
         let pending_transport = {
             let mut guard = self.state.lock().await;
             match &mut *guard {

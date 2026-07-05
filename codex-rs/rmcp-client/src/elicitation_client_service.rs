@@ -18,6 +18,9 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
+use crate::channel_ingress::ChannelIngressConfig;
+use crate::channel_ingress::DedupeStore;
+use crate::channel_ingress::try_handle_channel_notification;
 use crate::logging_client_handler::LoggingClientHandler;
 use crate::rmcp_client::Elicitation;
 use crate::rmcp_client::ElicitationPauseState;
@@ -42,6 +45,8 @@ pub(crate) struct ElicitationClientService {
     supports_openai_form: bool,
     send_elicitation: Arc<SendElicitation>,
     pause_state: ElicitationPauseState,
+    channel_ingress: Option<ChannelIngressConfig>,
+    channel_dedupe: DedupeStore,
 }
 
 impl ElicitationClientService {
@@ -64,7 +69,13 @@ impl ElicitationClientService {
             supports_openai_form,
             send_elicitation,
             pause_state,
+            channel_ingress: None,
+            channel_dedupe: DedupeStore::new(),
         }
+    }
+
+    pub(crate) fn set_channel_ingress(&mut self, config: ChannelIngressConfig) {
+        self.channel_ingress = Some(config);
     }
 
     async fn create_elicitation(
@@ -126,6 +137,18 @@ impl Service<RoleClient> for ElicitationClientService {
         notification: ServerNotification,
         context: NotificationContext<RoleClient>,
     ) -> Result<(), rmcp::ErrorData> {
+        if let Some(ref ingress_config) = self.channel_ingress {
+            if let ServerNotification::CustomNotification(ref custom) = notification {
+                if try_handle_channel_notification(
+                    ingress_config,
+                    &self.channel_dedupe,
+                    &custom.method,
+                    custom.params.as_ref(),
+                ) {
+                    return Ok(());
+                }
+            }
+        }
         <LoggingClientHandler as Service<RoleClient>>::handle_notification(
             &self.handler,
             notification,
