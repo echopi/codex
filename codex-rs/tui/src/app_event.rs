@@ -156,8 +156,9 @@ pub(crate) enum AppEvent {
         btw_mode: bool,
     },
 
-    /// Auto-return from a /btw ephemeral side conversation after the first turn completes.
-    BtwAutoReturn,
+    /// A /btw ephemeral side conversation finished its turn; hold on the answer
+    /// and update the context label so the user can read before returning.
+    BtwTurnCompleted,
 
     /// Submit an op to the specified thread, regardless of current focus.
     SubmitThreadOp {
