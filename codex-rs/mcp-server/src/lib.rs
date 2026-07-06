@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 //! Prototype MCP server.
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 
