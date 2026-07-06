@@ -464,13 +464,15 @@ impl Session {
     /// Starts a regular turn with the provided sub-id when pending work should wake an idle
     /// session.
     ///
-    /// The turn is created only when there is mailbox mail marked with `trigger_turn`, and only
-    /// if the session is currently idle.
+    /// The turn is created only when there is mailbox mail marked with `trigger_turn`
+    /// or queued external channel input, and only if the session is currently idle.
     pub(crate) async fn maybe_start_turn_for_pending_work_with_sub_id(
         self: &Arc<Self>,
         sub_id: String,
     ) {
-        if !self.input_queue.has_trigger_turn_mailbox_items().await {
+        let has_trigger = self.input_queue.has_trigger_turn_mailbox_items().await
+            || self.input_queue.has_pending_channel_items().await;
+        if !has_trigger {
             return;
         }
 
@@ -797,6 +799,14 @@ impl Session {
             return;
         }
         self.emit_thread_idle_lifecycle_if_idle().await;
+        // Known limitation: channel work enqueued during this teardown
+        // window waits for the next user interaction to be picked up.
+        // A recheck here would create an opaque-type cycle (E0391) or
+        // query depth overflow through the start_task → on_task_finished
+        // → maybe_start → start_task chain. The window is sub-millisecond
+        // (between active_turn clear and this point). If this proves
+        // problematic, the fix is a session-level event loop that polls
+        // pending work independently of the task lifecycle.
     }
 
     async fn take_active_turn(&self) -> Option<ActiveTurn> {

@@ -186,6 +186,7 @@ async fn reads_declared_config_only_through_executor_file_system() {
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             },
         )]
     );
@@ -240,6 +241,7 @@ async fn reads_manifest_object_config_without_executor_file_system_access() {
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             },
         )]
     );

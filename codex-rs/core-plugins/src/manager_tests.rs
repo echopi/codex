@@ -663,6 +663,7 @@ async fn load_plugins_loads_default_skills_and_mcp_servers() {
                     }),
                     oauth_resource: None,
                     tools: HashMap::new(),
+                    surface_notifications: false,
                 },
             )]),
             apps: vec![app_declaration("example", "connector_example")],
@@ -752,6 +753,7 @@ enabled = true
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             },
         )])
     );
@@ -1504,6 +1506,7 @@ async fn load_plugins_uses_manifest_configured_component_paths() {
                     oauth: None,
                     oauth_resource: None,
                     tools: HashMap::new(),
+                    surface_notifications: false,
                 },
             )])
         );
@@ -1684,6 +1687,7 @@ async fn load_plugins_ignores_manifest_component_paths_without_dot_slash() {
                 oauth: None,
                 oauth_resource: None,
                 tools: HashMap::new(),
+                surface_notifications: false,
             },
         )])
     );
@@ -1934,6 +1938,7 @@ fn capability_index_filters_inactive_and_zero_capability_plugins() {
         oauth: None,
         oauth_resource: None,
         tools: HashMap::new(),
+        surface_notifications: false,
     };
     let plugin = |config_name: &str, dir_name: &str, manifest_name: &str| LoadedPlugin {
         config_name: config_name.to_string(),

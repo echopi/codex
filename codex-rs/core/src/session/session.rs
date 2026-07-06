@@ -1164,6 +1164,19 @@ impl Session {
                     cwd,
                 )
             };
+            let on_channel_notification: Option<codex_rmcp_client::OnChannelNotification> = {
+                let sess_weak = std::sync::Arc::downgrade(&sess);
+                Some(std::sync::Arc::new(move |notification: codex_protocol::channel_notification::ChannelNotification| {
+                    let sess_weak = sess_weak.clone();
+                    tokio::spawn(async move {
+                        let Some(sess) = sess_weak.upgrade() else {
+                            return;
+                        };
+                        sess.input_queue.enqueue_channel_input(notification).await;
+                        sess.maybe_start_turn_for_pending_work().await;
+                    });
+                }))
+            };
             let mcp_connection_manager = McpConnectionManager::new(
                 &mcp_servers,
                 config.mcp_oauth_credentials_store_mode,
@@ -1186,6 +1199,7 @@ impl Session {
                 tool_plugin_provenance,
                 auth,
                 Some(sess.mcp_elicitation_reviewer()),
+                on_channel_notification,
             )
             .instrument(info_span!(
                 "session_init.mcp_manager_init",

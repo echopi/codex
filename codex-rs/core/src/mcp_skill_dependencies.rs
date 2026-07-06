@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use codex_config::ConfigEditsBuilder;
 use codex_config::McpServerConfig;
@@ -32,7 +33,7 @@ const MCP_DEPENDENCY_OPTION_INSTALL: &str = "Install";
 const MCP_DEPENDENCY_OPTION_SKIP: &str = "Continue anyway";
 
 pub(crate) async fn maybe_prompt_and_install_mcp_dependencies(
-    sess: &Session,
+    sess: &Arc<Session>,
     turn_context: &TurnContext,
     cancellation_token: &CancellationToken,
     mentioned_skills: &[SkillMetadata],
@@ -79,7 +80,7 @@ pub(crate) async fn maybe_prompt_and_install_mcp_dependencies(
 }
 
 pub(crate) async fn maybe_install_mcp_dependencies(
-    sess: &Session,
+    sess: &Arc<Session>,
     turn_context: &TurnContext,
     config: &crate::config::Config,
     mentioned_skills: &[SkillMetadata],
@@ -377,6 +378,7 @@ fn mcp_dependency_to_server_config(
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         });
     }
 
@@ -407,6 +409,7 @@ fn mcp_dependency_to_server_config(
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         });
     }
 

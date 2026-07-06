@@ -42,6 +42,7 @@ fn server(url: &str) -> McpServerConfig {
                 approval_mode: Some(AppToolApproval::Approve),
             },
         )]),
+        surface_notifications: false,
     }
 }
 

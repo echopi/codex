@@ -48,6 +48,7 @@ fn stdio_server(
         oauth: None,
         oauth_resource: None,
         tools: HashMap::new(),
+        surface_notifications: false,
     }
 }
 
@@ -83,6 +84,7 @@ fn declared_placement_preserves_local_plugin_normalization() {
         }),
         oauth_resource: None,
         tools: HashMap::new(),
+        surface_notifications: false,
     };
 
     let outcome = parse_plugin_mcp_config(

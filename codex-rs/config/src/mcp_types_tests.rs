@@ -447,6 +447,7 @@ fn deserialize_ignores_unknown_server_fields() {
             oauth: None,
             oauth_resource: None,
             tools: HashMap::new(),
+            surface_notifications: false,
         }
     );
 }

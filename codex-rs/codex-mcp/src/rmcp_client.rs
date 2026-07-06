@@ -154,6 +154,7 @@ impl AsyncManagedClient {
         runtime_auth_provider: Option<SharedAuthProvider>,
         client_elicitation_capability: ElicitationCapability,
         supports_openai_form_elicitation: bool,
+        channel_ingress: Option<codex_rmcp_client::ChannelIngressConfig>,
     ) -> Self {
         let tool_filter = server
             .configured_config()
@@ -208,6 +209,7 @@ impl AsyncManagedClient {
                         codex_apps_tools_cache_context,
                         client_elicitation_capability,
                         supports_openai_form_elicitation,
+                        channel_ingress,
                     },
                 )
                 .await
@@ -485,6 +487,7 @@ async fn start_server_task(
         codex_apps_tools_cache_context,
         client_elicitation_capability,
         supports_openai_form_elicitation,
+        channel_ingress,
     } = params;
     let params = mcp_initialize_request_params(
         client_elicitation_capability,
@@ -494,7 +497,7 @@ async fn start_server_task(
     let send_elicitation = elicitation_requests.make_sender(server_name.clone(), tx_event);
 
     let initialize_result = client
-        .initialize(params, startup_timeout, send_elicitation)
+        .initialize(params, startup_timeout, send_elicitation, channel_ingress)
         .await
         .map_err(StartupOutcomeError::from)?;
 
@@ -593,6 +596,7 @@ struct StartServerTaskParams {
     codex_apps_tools_cache_context: Option<CodexAppsToolsCacheContext>,
     client_elicitation_capability: ElicitationCapability,
     supports_openai_form_elicitation: bool,
+    channel_ingress: Option<codex_rmcp_client::ChannelIngressConfig>,
 }
 
 async fn make_rmcp_client(

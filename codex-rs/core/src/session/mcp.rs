@@ -304,7 +304,7 @@ impl Session {
     }
 
     async fn refresh_mcp_servers_inner(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         mcp_servers: HashMap<String, McpServerConfig>,
         store_mode: OAuthCredentialsStoreMode,
@@ -346,6 +346,19 @@ impl Session {
             *guard = cancellation_token.clone();
             cancellation_token
         };
+        let on_channel_notification: Option<codex_rmcp_client::OnChannelNotification> = {
+            let sess_weak = std::sync::Arc::downgrade(self);
+            Some(std::sync::Arc::new(move |notification: codex_protocol::channel_notification::ChannelNotification| {
+                let sess_weak = sess_weak.clone();
+                tokio::spawn(async move {
+                    let Some(sess) = sess_weak.upgrade() else {
+                        return;
+                    };
+                    sess.input_queue.enqueue_channel_input(notification).await;
+                    sess.maybe_start_turn_for_pending_work().await;
+                });
+            }))
+        };
         let refreshed_manager = McpConnectionManager::new(
             &mcp_servers,
             store_mode,
@@ -368,6 +381,7 @@ impl Session {
             tool_plugin_provenance,
             auth.as_ref(),
             elicitation_reviewer,
+            on_channel_notification,
         )
         .await;
         {
@@ -380,7 +394,7 @@ impl Session {
     }
 
     pub(crate) async fn refresh_mcp_servers_if_requested(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         elicitation_reviewer: Option<ElicitationReviewerHandle>,
     ) {
@@ -460,7 +474,7 @@ impl Session {
     }
 
     pub(crate) async fn refresh_mcp_servers_now(
-        &self,
+        self: &Arc<Self>,
         turn_context: &TurnContext,
         mcp_servers: HashMap<String, McpServerConfig>,
         store_mode: OAuthCredentialsStoreMode,

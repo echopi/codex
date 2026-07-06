@@ -282,6 +282,7 @@ pub async fn list_accessible_connectors_from_mcp_tools_with_mcp_manager(
         ToolPluginProvenance::default(),
         auth.as_ref(),
         /*elicitation_reviewer*/ None,
+        /*on_channel_notification*/ None,
     )
     .await;
 

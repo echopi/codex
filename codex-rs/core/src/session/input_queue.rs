@@ -1,6 +1,7 @@
 use crate::state::ActiveTurn;
 use crate::state::MailboxDeliveryPhase;
 use crate::state::TurnState;
+use codex_protocol::channel_notification::ChannelNotification;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::InterAgentCommunication;
 use codex_protocol::user_input::UserInput;
@@ -8,6 +9,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::watch;
+
+/// Maximum queued external channel notifications. Oldest entries are dropped
+/// first so the most recent messages win if an opted-in server floods.
+const MAX_PENDING_CHANNEL_ITEMS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum TurnInput {
@@ -35,6 +40,7 @@ pub(crate) struct TurnInputQueue {
 pub(crate) struct InputQueue {
     activity_tx: watch::Sender<InputQueueActivity>,
     mailbox_pending_mails: Mutex<VecDeque<InterAgentCommunication>>,
+    channel_pending: Mutex<VecDeque<ChannelNotification>>,
 }
 
 impl InputQueue {
@@ -43,6 +49,7 @@ impl InputQueue {
         Self {
             activity_tx,
             mailbox_pending_mails: Mutex::new(VecDeque::new()),
+            channel_pending: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -90,6 +97,45 @@ impl InputQueue {
             .await
             .iter()
             .any(|mail| mail.trigger_turn)
+    }
+
+    pub(crate) async fn enqueue_channel_input(&self, notification: ChannelNotification) {
+        {
+            let mut pending = self.channel_pending.lock().await;
+            while pending.len() >= MAX_PENDING_CHANNEL_ITEMS {
+                if let Some(dropped) = pending.pop_front() {
+                    tracing::warn!(
+                        msg_id = %dropped.msg_id,
+                        source = %dropped.source,
+                        "channel input queue full, dropping oldest notification"
+                    );
+                }
+            }
+            pending.push_back(notification);
+        }
+        self.activity_tx.send_replace(InputQueueActivity::Mailbox);
+    }
+
+    pub(crate) async fn has_pending_channel_items(&self) -> bool {
+        !self.channel_pending.lock().await.is_empty()
+    }
+
+    pub(crate) async fn drain_channel_input_items(&self) -> Vec<TurnInput> {
+        self.channel_pending
+            .lock()
+            .await
+            .drain(..)
+            .map(|n| {
+                let xml = n.to_xml();
+                TurnInput::UserInput {
+                    content: vec![UserInput::Text {
+                        text: xml,
+                        text_elements: vec![],
+                    }],
+                    client_id: None,
+                }
+            })
+            .collect()
     }
 
     pub(crate) async fn drain_mailbox_input_items(&self) -> Vec<TurnInput> {
@@ -215,11 +261,13 @@ impl InputQueue {
             return pending_input;
         }
         let mailbox_items = self.drain_mailbox_input_items().await.into_iter();
+        let channel_items = self.drain_channel_input_items().await.into_iter();
         if pending_input.is_empty() {
-            mailbox_items.collect()
+            mailbox_items.chain(channel_items).collect()
         } else {
             let mut pending_input = pending_input;
             pending_input.extend(mailbox_items);
+            pending_input.extend(channel_items);
             pending_input
         }
     }
@@ -248,7 +296,10 @@ impl InputQueue {
         if !accepts_mailbox_delivery {
             return false;
         }
-        self.has_pending_mailbox_items().await
+        if self.has_pending_mailbox_items().await {
+            return true;
+        }
+        self.has_pending_channel_items().await
     }
 }
 
@@ -416,5 +467,74 @@ mod tests {
             ))
             .await;
         assert!(input_queue.has_trigger_turn_mailbox_items().await);
+    }
+
+    fn make_channel_notification(msg_id: &str, content: &str) -> ChannelNotification {
+        ChannelNotification {
+            server_name: "dingtalk".to_string(),
+            source: "dingtalk".to_string(),
+            conversation_id: Some("cid1".to_string()),
+            conversation_type: Some("direct".to_string()),
+            sender: Some("tester".to_string()),
+            sender_id: None,
+            msg_id: msg_id.to_string(),
+            timestamp: None,
+            content: content.to_string(),
+        }
+    }
+
+    fn turn_input_text(input: &TurnInput) -> Option<&str> {
+        match input {
+            TurnInput::UserInput { content, .. } => content.iter().find_map(|item| match item {
+                UserInput::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            }),
+            _ => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn input_queue_drains_channel_items_after_mailbox() {
+        let input_queue = InputQueue::new();
+        input_queue
+            .enqueue_channel_input(make_channel_notification("m1", "hello from dingtalk"))
+            .await;
+        input_queue
+            .enqueue_mailbox_communication(make_mail(
+                AgentPath::root(),
+                AgentPath::try_from("/root/worker").expect("agent path"),
+                "mail first",
+                /*trigger_turn*/ false,
+            ))
+            .await;
+
+        let active_turn = Mutex::new(None);
+        let items = input_queue.get_pending_input(&active_turn).await;
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], TurnInput::InterAgentCommunication(_)));
+        let channel_text = turn_input_text(&items[1]).expect("channel item is user input text");
+        assert!(channel_text.starts_with("<channel "));
+        assert!(channel_text.contains(r#"source="dingtalk""#));
+        assert!(channel_text.contains(r#"msg_id="m1""#));
+        assert!(channel_text.contains("hello from dingtalk"));
+    }
+
+    #[tokio::test]
+    async fn input_queue_channel_items_wake_idle_session_and_drain_once() {
+        let input_queue = InputQueue::new();
+        let active_turn = Mutex::new(None);
+        assert!(!input_queue.has_pending_input(&active_turn).await);
+
+        input_queue
+            .enqueue_channel_input(make_channel_notification("m2", "ping"))
+            .await;
+        assert!(input_queue.has_pending_channel_items().await);
+        assert!(input_queue.has_pending_input(&active_turn).await);
+
+        let items = input_queue.get_pending_input(&active_turn).await;
+        assert_eq!(items.len(), 1);
+        assert!(!input_queue.has_pending_channel_items().await);
+        assert!(!input_queue.has_pending_input(&active_turn).await);
+        assert!(input_queue.get_pending_input(&active_turn).await.is_empty());
     }
 }

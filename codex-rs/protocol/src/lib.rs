@@ -1,6 +1,7 @@
 pub mod account;
 mod agent_path;
 pub mod auth;
+pub mod channel_notification;
 mod session_id;
 mod thread_id;
 mod tool_name;

@@ -56,6 +56,7 @@ use codex_protocol::protocol::McpStartupFailure;
 use codex_protocol::protocol::McpStartupStatus;
 use codex_protocol::protocol::McpStartupUpdateEvent;
 use codex_rmcp_client::ElicitationResponse;
+use codex_rmcp_client::OnChannelNotification;
 use rmcp::model::ElicitationCapability;
 use rmcp::model::ListResourceTemplatesResult;
 use rmcp::model::ListResourcesResult;
@@ -137,6 +138,7 @@ impl McpConnectionManager {
         tool_plugin_provenance: ToolPluginProvenance,
         auth: Option<&CodexAuth>,
         elicitation_reviewer: Option<ElicitationReviewerHandle>,
+        on_channel_notification: Option<OnChannelNotification>,
     ) -> Self {
         let mut required_servers = mcp_servers
             .iter()
@@ -197,6 +199,20 @@ impl McpConnectionManager {
                 } else {
                     None
                 };
+            let channel_ingress_for_server = on_channel_notification.as_ref().and_then(|cb| {
+                let surface = server
+                    .configured_config()
+                    .map(|c| c.surface_notifications)
+                    .unwrap_or(false);
+                if !surface {
+                    return None;
+                }
+                Some(codex_rmcp_client::ChannelIngressConfig {
+                    server_name: server_name.clone(),
+                    surface_notifications: true,
+                    on_notification: Arc::clone(cb),
+                })
+            });
             let async_managed_client = AsyncManagedClient::new(
                 server_name.clone(),
                 server,
@@ -211,6 +227,7 @@ impl McpConnectionManager {
                 runtime_auth_provider,
                 client_elicitation_capability.clone(),
                 supports_openai_form_elicitation,
+                channel_ingress_for_server,
             );
             clients.insert(server_name.clone(), async_managed_client.clone());
             let tx_event = tx_event.clone();
